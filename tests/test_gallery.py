@@ -835,7 +835,11 @@ class GalleryTest(unittest.TestCase):
         s = self.start()
         ids = {i["n"]: i["id"] for i in s.get("/api/list?limit=50")["items"]}
         self.assertIsNone(s.get(f"/api/item/{ids['a.jpg']}")["codec"])
-        self.assertEqual(s.get(f"/api/item/{ids['v.mp4']}")["codec"], "h264")
+        # The clip's codec is whatever this ffmpeg's default mp4 encoder is (h264 with libx264, mpeg4 without),
+        # so compare with ffprobe's own read rather than a fixed name.
+        probed = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=codec_name",
+                                 "-of", "default=nw=1:nk=1", self.v], capture_output=True, text=True, check=True)
+        self.assertEqual(s.get(f"/api/item/{ids['v.mp4']}")["codec"], probed.stdout.strip())
 
     # ------------------------------------------------------------ page layout and the sidebar's counts
     def test_page_layout_and_facet_counts(self):
